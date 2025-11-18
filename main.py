@@ -1,8 +1,13 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Any, Dict
 
-app = FastAPI()
+from database import create_document
+from schemas import Auditrequest
+
+app = FastAPI(title="Smart Contract Audit API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -14,7 +19,7 @@ app.add_middleware(
 
 @app.get("/")
 def read_root():
-    return {"message": "Hello from FastAPI Backend!"}
+    return {"message": "Smart Contract Audit Backend Running"}
 
 @app.get("/api/hello")
 def hello():
@@ -23,7 +28,7 @@ def hello():
 @app.get("/test")
 def test_database():
     """Test endpoint to check if database is available and accessible"""
-    response = {
+    response: Dict[str, Any] = {
         "backend": "✅ Running",
         "database": "❌ Not Available",
         "database_url": None,
@@ -58,11 +63,26 @@ def test_database():
         response["database"] = f"❌ Error: {str(e)[:50]}"
     
     # Check environment variables
-    import os
     response["database_url"] = "✅ Set" if os.getenv("DATABASE_URL") else "❌ Not Set"
     response["database_name"] = "✅ Set" if os.getenv("DATABASE_NAME") else "❌ Not Set"
     
     return response
+
+@app.post("/api/audits")
+def create_audit_request(payload: Auditrequest):
+    """
+    Create a new smart contract audit request. Persists to MongoDB using the
+    collection derived from the schema class name ("auditrequest").
+    """
+    try:
+        doc_id = create_document("auditrequest", payload)
+        return {
+            "status": "success",
+            "id": doc_id,
+            "message": "Thanks! Your audit request has been received. Our team will reach out shortly."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create audit request: {str(e)}")
 
 
 if __name__ == "__main__":
